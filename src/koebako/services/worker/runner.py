@@ -64,6 +64,7 @@ async def process_next_note(now: datetime | None = None) -> bool:
                 claim,
                 notification=transcribed_notification(
                     claim.note.id,
+                    transcript,
                     duration_seconds,
                     STT_MODEL_NAME or "client-provided transcript",
                 ),

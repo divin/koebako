@@ -21,7 +21,11 @@ from koebako.shared.models.notification import (
     NotificationOutbox,
     NotificationStatus,
 )
-from koebako.shared.notifications import enqueue_notification, received_notification
+from koebako.shared.notifications import (
+    enqueue_notification,
+    received_notification,
+    transcribed_notification,
+)
 
 
 @pytest.fixture
@@ -116,7 +120,64 @@ async def test_worker_transcribes_then_delivers_versioned_payload(
         f"{note.id}:transcribed",
         f"{note.id}:delivered",
     }
+    transcript_event = next(
+        event for event in events if event.dedupe_key.endswith(":transcribed")
+    )
+    assert transcript_event.message == (
+        f"Transcript [{note.id.hex[:8]}]:\nA spoken note"
+    )
     assert await worker_runner.process_next_note(now) is False
+
+
+def test_debug_transcript_notification_keeps_transcript_and_diagnostics(
+    database_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Include transcript text in debug mode alongside lower-priority details."""
+    note = _create_note(database_engine)
+    monkeypatch.setattr(
+        notification_service, "NOTIFICATION_MODE", NotificationMode.DEBUG
+    )
+    with Session(database_engine) as session:
+        enqueue_notification(
+            session,
+            note.id,
+            transcribed_notification(note.id, "spoken words", 2.5, "test-model"),
+        )
+        session.commit()
+
+    event = next(
+        event
+        for event in _get_notifications(database_engine)
+        if event.note_id == note.id
+    )
+    assert "spoken words" in event.message
+    assert "in 2.5s using test-model" in event.message
+    assert event.priority == -1
+
+
+def test_transcript_notification_is_truncated_with_a_marker(
+    database_engine: Engine,
+) -> None:
+    """Keep long transcripts within Pushover's limit without silent clipping."""
+    note = _create_note(database_engine)
+    draft = transcribed_notification(note.id, "x" * 2_000, 1.0, "test-model")
+    with Session(database_engine) as session:
+        enqueue_notification(session, note.id, draft)
+        session.commit()
+
+    event = next(
+        event
+        for event in _get_notifications(database_engine)
+        if event.note_id == note.id
+    )
+    assert len(event.message) == 1024
+    assert event.message.endswith("… [truncated]")
+
+
+def _get_notifications(engine: Engine) -> list[NotificationOutbox]:
+    """Return all outbox messages for the test database."""
+    with Session(engine) as session:
+        return list(session.exec(select(NotificationOutbox)).all())
 
 
 @pytest.mark.asyncio

@@ -119,31 +119,41 @@ def oversized_upload_notification(
 
 
 def transcribed_notification(
-    note_id: UUID, duration_seconds: float, provider: str
+    note_id: UUID,
+    transcript: str | None,
+    duration_seconds: float,
+    provider: str,
 ) -> NotificationDraft:
-    """Build a transcription-complete notice without exposing transcript text.
+    """Build a transcription-complete notice that includes the transcript.
 
     Parameters
     ----------
     note_id : UUID
         Identifier of the transcribed note.
+    transcript : str or None
+        Text produced by speech recognition, included in the Pushover message.
     duration_seconds : float
         Elapsed time spent transcribing the note.
     provider : str
-        Configured STT model name, included only in debug mode.
+        Configured STT model name, included in debug mode.
 
     Returns
     -------
     NotificationDraft
-        Transcription event with safe diagnostics for debug mode.
+        Transcription event with transcript text and optional diagnostics.
     """
     short_id = _short_id(note_id)
+    text = (
+        transcript.strip()
+        if transcript and transcript.strip()
+        else "No transcript available."
+    )
     return NotificationDraft(
         event_key=f"{note_id}:transcribed",
-        message=f"Voice note transcribed [{short_id}].",
+        message=f"Transcript [{short_id}]:\n{text}",
         debug_message=(
-            f"Voice note transcribed [{short_id}] in {duration_seconds:.1f}s "
-            f"using {provider}."
+            f"Transcript [{short_id}] (in {duration_seconds:.1f}s using {provider}):\n"
+            f"{text}"
         ),
     )
 
@@ -299,7 +309,7 @@ def enqueue_notification(
         note_id=note_id,
         dedupe_key=draft.event_key,
         title="Koebako",
-        message=message[:1024],
+        message=_truncate_message(message),
         priority=priority,
     )
     statement = (
@@ -322,6 +332,14 @@ def enqueue_notification(
         .on_conflict_do_nothing(index_elements=[NotificationOutbox.dedupe_key])
     )
     session.exec(statement)
+
+
+def _truncate_message(message: str, limit: int = 1024) -> str:
+    """Keep Pushover messages within its limit and mark omitted text clearly."""
+    marker = "… [truncated]"
+    if len(message) <= limit:
+        return message
+    return message[: limit - len(marker)].rstrip() + marker
 
 
 def validate_notification_config() -> None:

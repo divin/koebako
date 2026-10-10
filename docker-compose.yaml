@@ -3,10 +3,9 @@ name: koebako
 services:
   api:
     image: ghcr.io/divin/koebako:latest
-    build: .
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     environment:
       WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:?Set WEBHOOK_TOKEN in .env}
       NOTIFICATION_MODE: ${NOTIFICATION_MODE:-normal}
@@ -18,7 +17,6 @@ services:
 
   worker:
     image: ghcr.io/divin/koebako:latest
-    build: .
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     command: ["python", "-m", "koebako.services.worker"]
     environment:
