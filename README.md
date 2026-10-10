@@ -118,7 +118,7 @@ For development, use Python 3.12, [`uv`](https://github.com/astral-sh/uv), and [
 
 ```sh
 uv sync --dev # Install development dependencies
-just        # Format, lint, and sort imports
-just check  # Check types, formatting, and lint without changing files
-just test   # Run the test suite
+just          # Format, lint, and sort imports
+just check    # Check types, formatting, and lint without changing files
+just test     # Run the test suite
 ```
