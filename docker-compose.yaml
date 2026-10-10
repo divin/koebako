@@ -1,0 +1,38 @@
+name: koebako
+
+services:
+  api:
+    image: ghcr.io/divin/koebako:latest
+    build: .
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:?Set WEBHOOK_TOKEN in .env}
+      NOTIFICATION_MODE: ${NOTIFICATION_MODE:-normal}
+      DATA_DIR: /data
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ${HOST_DATA_DIR:-./data}:/data
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/divin/koebako:latest
+    build: .
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    command: ["python", "-m", "koebako.services.worker"]
+    environment:
+      WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:?Set WEBHOOK_TOKEN in .env}
+      STT_URL: ${STT_URL:-}
+      STT_MODEL_NAME: ${STT_MODEL_NAME:-}
+      TRANSCRIPT_WEBHOOK_URL: ${TRANSCRIPT_WEBHOOK_URL:-}
+      TRANSCRIPT_WEBHOOK_AUTH_HEADER: ${TRANSCRIPT_WEBHOOK_AUTH_HEADER:-}
+      TRANSCRIPT_WEBHOOK_AUTH_VALUE: ${TRANSCRIPT_WEBHOOK_AUTH_VALUE:-}
+      NOTIFICATION_MODE: ${NOTIFICATION_MODE:-normal}
+      PUSHOVER_API_TOKEN: ${PUSHOVER_API_TOKEN:-}
+      PUSHOVER_USER_KEY: ${PUSHOVER_USER_KEY:-}
+      DATA_DIR: /data
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ${HOST_DATA_DIR:-./data}:/data
+    restart: unless-stopped

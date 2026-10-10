@@ -1,0 +1,1 @@
+"""Persistent Koebako data models."""
