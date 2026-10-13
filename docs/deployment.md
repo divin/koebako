@@ -35,6 +35,7 @@ Set `STT_URL` and `TRANSCRIPT_WEBHOOK_URL` to addresses reachable **from the wor
 | `WEBHOOK_TOKEN` | API and worker | Required shared secret Pebble sends as `Authorization: Bearer <token>`. |
 | `STT_URL` | Worker | Speech-to-text endpoint, usually ending in `/v1/audio/transcriptions`. |
 | `STT_MODEL_NAME` | Worker | Model identifier accepted by the speech-to-text service. |
+| `STT_REQUEST_TIMEOUT_SECONDS` | Worker | Per-request STT timeout in seconds, clamped to a minimum of 60; defaults to 900. Raise this if CPU transcriptions time out and disrupt the STT server. |
 | `TRANSCRIPT_WEBHOOK_URL` | Worker | Receiver endpoint for completed transcripts. |
 | `TRANSCRIPT_WEBHOOK_AUTH_HEADER` | Worker | Optional receiver authentication header name; set with the value below. |
 | `TRANSCRIPT_WEBHOOK_AUTH_VALUE` | Worker | Optional receiver authentication value, such as `Bearer <token>`. |

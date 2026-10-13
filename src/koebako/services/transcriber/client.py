@@ -7,13 +7,12 @@ from pathlib import Path
 import anyio
 import httpx
 
-from koebako.settings import STT_MODEL_NAME, STT_URL
+from koebako.settings import STT_MODEL_NAME, STT_REQUEST_TIMEOUT_SECONDS, STT_URL
 
 from .audio import to_wav
 
 logger = logging.getLogger(__name__)
 
-_REQUEST_TIMEOUT_SECONDS = 120
 _HEALTH_TIMEOUT_SECONDS = 10
 _MAX_ATTEMPTS = 3
 
@@ -115,7 +114,7 @@ async def transcribe(audio_path: Path) -> str | None:
 
     wav_path = await anyio.to_thread.run_sync(to_wav, audio_path)
     try:
-        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=STT_REQUEST_TIMEOUT_SECONDS) as client:
             for attempt in range(_MAX_ATTEMPTS):
                 try:
                     with wav_path.open("rb") as wav_file:
