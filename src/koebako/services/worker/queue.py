@@ -24,7 +24,7 @@ columns = cast(Any, Note).__table__.c
 
 LEASE_SECONDS = 600
 MAX_ATTEMPTS = 3
-BASE_RETRY_SECONDS = 5
+RETRY_DELAYS_SECONDS = (10, 30)
 
 
 class Stage(StrEnum):
@@ -51,7 +51,7 @@ def normalize_utc(value: datetime) -> datetime:
 
 
 def _retry_delay(attempt_count: int) -> int:
-    """Return the exponential retry delay for an attempt count.
+    """Return the retry delay for an attempt count.
 
     Parameters
     ----------
@@ -63,7 +63,8 @@ def _retry_delay(attempt_count: int) -> int:
     int
         Delay before retrying, in seconds.
     """
-    return BASE_RETRY_SECONDS * 2 ** max(0, attempt_count - 1)
+    retry_index = min(max(attempt_count - 1, 0), len(RETRY_DELAYS_SECONDS) - 1)
+    return RETRY_DELAYS_SECONDS[retry_index]
 
 
 def _ready_status(stage: Stage) -> NoteStatus:

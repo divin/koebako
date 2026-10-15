@@ -181,10 +181,10 @@ def _get_notifications(engine: Engine) -> list[NotificationOutbox]:
 
 
 @pytest.mark.asyncio
-async def test_delivery_failure_is_retried_without_retranscribing(
+async def test_delivery_retries_use_ten_then_thirty_seconds_without_retranscribing(
     database_engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Verify delivery retries reuse a saved transcript without transcribing."""
+    """Verify retry delays grow while a saved transcript is reused."""
     note = _create_note(
         database_engine,
         transcript="already transcribed",
@@ -196,29 +196,38 @@ async def test_delivery_failure_is_retried_without_retranscribing(
         """Fail if a delivery retry unexpectedly invokes transcription."""
         raise AssertionError("a saved transcript should not be transcribed again")
 
-    async def fail_once(_: Note) -> None:
-        """Fail the first delivery attempt and accept the next one."""
+    async def fail_twice(_: Note) -> None:
+        """Fail twice, then accept the delivery without retranscribing."""
         nonlocal deliveries
         deliveries += 1
-        if deliveries == 1:
+        if deliveries < 3:
             raise RuntimeError("receiver temporarily unavailable")
 
     monkeypatch.setattr(worker_runner, "transcribe_note", unexpected_transcribe)
-    monkeypatch.setattr(worker_runner, "post_transcript", fail_once)
+    monkeypatch.setattr(worker_runner, "post_transcript", fail_twice)
     start = datetime(2025, 1, 1, tzinfo=UTC)
 
     assert await worker_runner.process_next_note(start) is True
     failed = _get_note(database_engine, note.id)
     assert failed.status == NoteStatus.TRANSCRIBED
     assert failed.attempt_count == 1
-    assert failed.next_attempt_at == start.replace(tzinfo=None) + timedelta(seconds=5)
+    first_retry_at = start.replace(tzinfo=None) + timedelta(seconds=10)
+    assert failed.next_attempt_at == first_retry_at
 
-    assert await worker_runner.process_next_note(start + timedelta(seconds=4)) is False
-    assert await worker_runner.process_next_note(start + timedelta(seconds=5)) is True
+    assert await worker_runner.process_next_note(start + timedelta(seconds=9)) is False
+    assert await worker_runner.process_next_note(start + timedelta(seconds=10)) is True
+    failed_again = _get_note(database_engine, note.id)
+    assert failed_again.status == NoteStatus.TRANSCRIBED
+    assert failed_again.attempt_count == 2
+    second_retry_at = start.replace(tzinfo=None) + timedelta(seconds=40)
+    assert failed_again.next_attempt_at == second_retry_at
+
+    assert await worker_runner.process_next_note(start + timedelta(seconds=39)) is False
+    assert await worker_runner.process_next_note(start + timedelta(seconds=40)) is True
     recovered = _get_note(database_engine, note.id)
     assert recovered.status == NoteStatus.DELIVERED
     assert recovered.transcript == "already transcribed"
-    assert deliveries == 2
+    assert deliveries == 3
 
 
 @pytest.mark.asyncio

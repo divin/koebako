@@ -139,13 +139,44 @@ async def transcribe(audio_path: Path) -> str | None:
                     )
                     return transcript
                 except httpx.HTTPStatusError as exc:
-                    if exc.response.status_code < 500 or attempt + 1 == _MAX_ATTEMPTS:
+                    if exc.response.status_code < 500:
                         raise
-                except httpx.TransportError:
                     if attempt + 1 == _MAX_ATTEMPTS:
+                        logger.error(
+                            "STT server returned HTTP %s after %d attempts",
+                            exc.response.status_code,
+                            _MAX_ATTEMPTS,
+                        )
                         raise
+                    retry_delay = 2**attempt
+                    logger.warning(
+                        "STT server returned HTTP %s on attempt %d/%d; retrying in %ds",
+                        exc.response.status_code,
+                        attempt + 1,
+                        _MAX_ATTEMPTS,
+                        retry_delay,
+                    )
+                except httpx.TransportError as exc:
+                    if attempt + 1 == _MAX_ATTEMPTS:
+                        logger.error(
+                            "STT transport request failed after %d attempts (%s): %s",
+                            _MAX_ATTEMPTS,
+                            type(exc).__name__,
+                            exc,
+                        )
+                        raise
+                    retry_delay = 2**attempt
+                    logger.warning(
+                        "STT transport error on attempt %d/%d (%s): %s; "
+                        "retrying in %ds",
+                        attempt + 1,
+                        _MAX_ATTEMPTS,
+                        type(exc).__name__,
+                        exc,
+                        retry_delay,
+                    )
 
-                await asyncio.sleep(2**attempt)
+                await asyncio.sleep(retry_delay)
     finally:
         wav_path.unlink(missing_ok=True)
 

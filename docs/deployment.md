@@ -60,6 +60,6 @@ Koebako stores:
 
 Back up the complete data directory. Keep Koebako's database and recordings on a local filesystem, and do not point Koebako at another application's data directory.
 
-A transcript may be delivered more than once after receiver errors or timeouts. Receivers should use the stable `note_id` for idempotency. See [API reference](api.md#transcript-delivery) for the contract.
+Failed processing stages are retried after 10 seconds and then 30 seconds before being marked as failed. STT transport and server errors also receive short in-request retries. A transcript may be delivered more than once after receiver errors or timeouts; receivers should use the stable `note_id` for idempotency. See [API reference](api.md#transcript-delivery) for the contract.
 
 The image release workflow publishes version tags and `latest` from Git tags. Stable tags (for example, `1.0.0`) update `latest`; prerelease tags containing a hyphen do not. Use the repository's Compose file as a deployment example and adjust its settings to your environment.
